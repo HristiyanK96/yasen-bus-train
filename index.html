@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ясен ⇄ Плевен — влакове и автобуси</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --card: #1a2233;
+    --card2: #212b40;
+    --text: #e8ecf4;
+    --muted: #93a0b8;
+    --accent: #4da3ff;
+    --train: #7ee08a;
+    --bus: #ffc46b;
+    --danger: #ff7b7b;
+    --border: #2b3650;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 16px 12px 48px;
+    max-width: 640px; margin: 0 auto;
+  }
+  header { text-align: center; margin-bottom: 14px; }
+  header h1 { font-size: 1.45rem; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+  .clock { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  .toggle { display: flex; gap: 8px; margin: 14px 0 10px; }
+  .toggle button {
+    flex: 1; padding: 12px 8px; font-size: 1rem; font-weight: 600;
+    background: var(--card); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
+  }
+  .toggle button.active { background: var(--accent); color: #08111f; border-color: var(--accent); }
+
+  .filters { display: flex; gap: 6px; margin-bottom: 14px; }
+  .filters button {
+    flex: 1; padding: 7px 4px; font-size: .85rem;
+    background: var(--card); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  }
+  .filters button.active { color: var(--text); border-color: var(--accent); }
+
+  .next-card {
+    background: linear-gradient(135deg, var(--card2), var(--card));
+    border: 1px solid var(--accent); border-radius: 16px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .next-card .label { font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+  .next-card .main { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .next-card .time { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .next-card .countdown { font-size: 1.05rem; color: var(--train); font-weight: 600; }
+  .next-card .details { margin-top: 8px; color: var(--muted); font-size: .92rem; line-height: 1.5; }
+  .next-card .details b { color: var(--text); }
+
+  .daybar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .85rem; color: var(--muted); flex-wrap: wrap; }
+  .daybar select {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 8px; font-size: .85rem;
+  }
+
+  ul.list { list-style: none; }
+  ul.list li {
+    display: flex; gap: 12px; align-items: center;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  ul.list li.past { opacity: .38; }
+  ul.list li.next-hl { border-color: var(--accent); }
+  .t { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 62px; }
+  .badge {
+    font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: .5px; flex-shrink: 0;
+  }
+  .badge.train { background: rgba(126,224,138,.15); color: var(--train); }
+  .badge.bus { background: rgba(255,196,107,.15); color: var(--bus); }
+  .info { flex: 1; min-width: 0; }
+  .info .r1 { font-size: .92rem; font-weight: 600; }
+  .info .r2 { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+  .arr { text-align: right; font-size: .8rem; color: var(--muted); flex-shrink: 0; }
+  .arr b { display: block; color: var(--text); font-size: .95rem; font-variant-numeric: tabular-nums; }
+
+  .empty { text-align: center; color: var(--muted); padding: 24px 12px; }
+  footer { margin-top: 28px; font-size: .78rem; color: var(--muted); line-height: 1.7; border-top: 1px solid var(--border); padding-top: 14px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  h2.sec { font-size: .95rem; color: var(--muted); margin: 18px 0 8px; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚆 Ясен ⇄ Плевен 🚌</h1>
+  <div class="sub"><span class="clock" id="clock"></span> · <span id="daylabel"></span></div>
+</header>
+
+<div class="toggle">
+  <button id="dir-yp">Ясен → Плевен</button>
+  <button id="dir-py">Плевен → Ясен</button>
+</div>
+
+<div class="filters">
+  <button data-f="all" class="active">Всички</button>
+  <button data-f="train">🚆 Влакове</button>
+  <button data-f="bus">🚌 Автобуси</button>
+</div>
+
+<div id="next"></div>
+
+<div class="daybar">
+  <span>Разписание за:</span>
+  <select id="daysel">
+    <option value="auto">Днес (автоматично)</option>
+    <option value="work">Работен ден</option>
+    <option value="sat">Събота</option>
+    <option value="sun">Неделя</option>
+    <option value="hol">Официален празник</option>
+  </select>
+</div>
+
+<h2 class="sec" id="listtitle"></h2>
+<ul class="list" id="list"></ul>
+
+<footer>
+  <b>Източници</b> (данни събрани на 02.07.2026):
+  влакове — <a href="https://razpisanie.bdz.bg/bg/pleven/jasen">razpisanie.bdz.bg</a> (официален сайт на БДЖ);
+  автобуси — <a href="https://avtogarapleven.com/">avtogarapleven.com</a> (Автогара Плевен, тел. 064 888 666).<br>
+  🚆 Влаковете спират на <b>жп гара Ясен</b>; в Плевен повечето спират и на Централна гара, и на Плевен-Запад.
+  🚌 Автобусите спират в селото на главния път (спирки Ясен I / Ясен II).<br>
+  Билет за влака: купува се на гарата или онлайн (за БВ — със задължителна резервация). Автобусен билет: от касата на автогарата или от шофьора.<br>
+  ⚠️ Разписанията се променят — при важно пътуване проверете в източника. Дните на движение при празници са ориентировъчни.
+</footer>
+
+<script>
+// ===== ДАННИ (събрани 02.07.2026) =====
+// days: daily | work (пон–пт, без празници) | work_sat | work_sun | sat | sun | sun_hol |
+//       sat_sun | sat_sun_hol | no_sat (без събота) | no_sun (без неделя) | mwf (пон/ср/пт)
+// t = тръгване, a = пристигане
+
+const DATA = {
+  // Ясен → Плевен
+  yp: {
+    from: "Ясен", to: "Плевен",
+    trains: [ // t = тръгва от гара Ясен, a = пристига на Централна гара Плевен
+      {t:"06:36", a:"06:46", name:"КПВ 23201", via:"от Черквица", days:"daily"},
+      {t:"06:57", a:"07:04", name:"БВ 2655",   via:"Враца → Варна", days:"no_sun"},
+      {t:"08:54", a:"09:04", name:"ПВ 20131",  via:"Мездра → Г. Оряховица", days:"no_sun"},
+      {t:"09:27", a:"09:37", name:"КПВ 23203", via:"от Черквица", days:"daily"},
+      {t:"10:40", a:"10:49", name:"ПВ 20133",  via:"от Враца", days:"daily"},
+      {t:"12:20", a:"12:30", name:"КПВ 23205", via:"Черквица → Левски", days:"daily"},
+      {t:"12:53", a:"13:00", name:"БВ 2613",   via:"София → Варна", days:"daily"},
+      {t:"13:53", a:"14:03", name:"ПВ 20141",  via:"Червен бряг → Г. Оряховица", days:"daily"},
+      {t:"15:56", a:"16:03", name:"БВ 2615",   via:"София → Варна", days:"work"},
+      {t:"17:33", a:"17:42", name:"ПВ 20135",  via:"Враца → Левски", days:"daily"},
+      {t:"18:02", a:"18:12", name:"КПВ 23207", via:"от Черквица", days:"daily"},
+      {t:"18:12", a:"18:19", name:"БВ 4610",   via:"София → Русе", days:"work"},
+      {t:"18:53", a:"19:02", name:"ПВ 20101",  via:"София → Г. Оряховица", days:"daily"},
+      {t:"19:31", a:"19:37", name:"БВ 2641",   via:"София → Г. Оряховица", days:"work"},
+      {t:"21:05", a:"21:15", name:"КПВ 23209", via:"от Черквица", days:"daily"},
+    ],
+    buses: [ // t = минава през Ясен, a = пристига на АГ Плевен
+      {t:"06:44", a:"07:04", name:"от Садовец", op:"Дари Комерс", days:"work"},
+      {t:"06:56", a:"07:20", name:"от Долни Дъбник", op:"Дари Комерс", days:"sat_sun"},
+      {t:"07:01", a:"07:25", name:"от Долни Дъбник", op:"Дари Комерс", days:"work_sat"},
+      {t:"07:30", a:"07:42", name:"от Долни Луковит", op:"Ауто клима транс", days:"work"},
+      {t:"07:33", a:"08:00", name:"от Бъркач", op:"Дари Комерс", days:"no_sun"},
+      {t:"07:39", a:"07:59", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+      {t:"08:09", a:"08:20", name:"от Луковит", op:"Хоризонт", days:"daily"},
+      {t:"08:11", a:"08:35", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+      {t:"08:25", a:"08:46", name:"от Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"08:43", a:"09:10", name:"от Бъркач", op:"Дари Комерс", days:"no_sat"},
+      {t:"08:58", a:"09:10", name:"от Червен бряг", op:"Спарк 2012", days:"daily"},
+      {t:"09:33", a:"10:00", name:"от Бъркач", op:"Дари Комерс", days:"work"},
+      {t:"09:40", a:"09:55", name:"от Бяла Слатина", op:"Копривски", days:"no_sun"},
+      {t:"09:50", a:"10:02", name:"от Староселци", op:"Ауто клима транс", days:"daily"},
+      {t:"09:55", a:"10:05", name:"от Козлодуй", op:"Скорпио 05", days:"daily"},
+      {t:"10:11", a:"10:35", name:"от Долни Дъбник", op:"Дари Комерс", days:"work_sun"},
+      {t:"10:40", a:"11:01", name:"от Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"12:11", a:"12:35", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+      {t:"12:34", a:"12:55", name:"от Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"13:03", a:"13:30", name:"от Бъркач", op:"Дари Комерс", days:"daily"},
+      {t:"13:11", a:"13:35", name:"от Долни Дъбник", op:"Дари Комерс", days:"sat"},
+      {t:"13:39", a:"13:59", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+      {t:"14:03", a:"14:13", name:"от Долни Луковит", op:"Ауто клима транс", days:"work"},
+      {t:"14:25", a:"14:46", name:"от Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"15:11", a:"15:35", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+      {t:"15:22", a:"15:37", name:"от Бяла Слатина", op:"Божи Дар Транс", days:"work"},
+      {t:"16:11", a:"16:35", name:"от Долни Дъбник", op:"Дари Комерс", days:"sat_sun"},
+      {t:"16:33", a:"17:00", name:"от Бъркач", op:"Дари Комерс", days:"work"},
+      {t:"17:33", a:"18:00", name:"от Бъркач", op:"Дари Комерс", days:"work"},
+      {t:"17:36", a:"17:50", name:"от Тетевен", op:"Алекса Транс", days:"sun"},
+      {t:"17:39", a:"17:59", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+      {t:"18:05", a:"18:17", name:"от Долни Луковит", op:"Ауто клима транс", days:"daily"},
+      {t:"18:34", a:"18:55", name:"от Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"18:39", a:"18:59", name:"от Долни Дъбник", op:"Дари Комерс", days:"sat_sun"},
+      {t:"19:03", a:"19:30", name:"от Бъркач", op:"Дари Комерс", days:"daily"},
+      {t:"20:09", a:"20:29", name:"от Долни Дъбник", op:"Дари Комерс", days:"work"},
+    ]
+  },
+  // Плевен → Ясен
+  py: {
+    from: "Плевен", to: "Ясен",
+    trains: [ // t = тръгва от Централна гара Плевен, a = пристига на гара Ясен
+      {t:"04:20", a:"04:30", name:"КПВ 23200", via:"за Черквица", days:"daily"},
+      {t:"06:55", a:"07:04", name:"КПВ 23202", via:"за Черквица", days:"daily"},
+      {t:"07:41", a:"07:50", name:"ПВ 20102",  via:"за София (през Червен бряг)", days:"daily"},
+      {t:"09:10", a:"09:20", name:"ПВ 20140",  via:"за Червен бряг", days:"daily"},
+      {t:"10:05", a:"10:15", name:"КПВ 23204", via:"за Черквица", days:"daily"},
+      {t:"11:20", a:"11:29", name:"ПВ 20130",  via:"за Мездра", days:"daily"},
+      {t:"13:58", a:"14:09", name:"ПВ 20132",  via:"за Мездра", days:"no_sun"},
+      {t:"15:48", a:"15:58", name:"КПВ 23206", via:"за Черквица", days:"daily"},
+      {t:"17:54", a:"18:01", name:"МБВ 461",   via:"за София", days:"daily"},
+      {t:"18:50", a:"18:59", name:"КПВ 23208", via:"за Черквица", days:"daily"},
+      {t:"19:45", a:"19:54", name:"ПВ 20134",  via:"за Мездра", days:"daily"},
+      {t:"21:23", a:"21:31", name:"БВ 2654",   via:"Варна → Враца", days:"work"},
+    ],
+    buses: [ // t = тръгва от АГ Плевен, a = пристига в Ясен
+      {t:"06:00", a:"06:26", name:"за Бъркач", op:"Дари Комерс", days:"work_sat", price:"2,00 €"},
+      {t:"07:00", a:"07:23", name:"за Садовец", op:"Дари Комерс", days:"work", price:"~1 €"},
+      {t:"07:10", a:"07:22", name:"за Долни Луковит", op:"Ауто клима транс", days:"daily"},
+      {t:"07:10", a:"07:36", name:"за Бъркач", op:"Дари Комерс", days:"no_sat", price:"2,00 €"},
+      {t:"07:30", a:"07:48", name:"за Долни Дъбник", op:"Дари Комерс", days:"work_sat", price:"1,80 €"},
+      {t:"08:00", a:"08:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"sun_hol", price:"1,80 €"},
+      {t:"08:00", a:"08:26", name:"за Бъркач", op:"Дари Комерс", days:"work", price:"2,00 €"},
+      {t:"09:00", a:"09:23", name:"за Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"09:00", a:"09:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"work_sat", price:"1,80 €"},
+      {t:"10:00", a:"10:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+      {t:"10:30", a:"10:42", name:"за Долни Луковит", op:"Ауто клима транс", days:"daily"},
+      {t:"10:30", a:"10:44", name:"за Бяла Слатина", op:"Копривски", days:"work_sat"},
+      {t:"11:00", a:"11:23", name:"за Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"11:00", a:"11:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+      {t:"11:30", a:"11:56", name:"за Бъркач", op:"Дари Комерс", days:"daily", price:"2,00 €"},
+      {t:"12:00", a:"12:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"sat", price:"1,80 €"},
+      {t:"12:35", a:"12:39", name:"за Луковит", op:"Хоризонт", days:"daily"},
+      {t:"13:00", a:"13:09", name:"за Козлодуй", op:"Скорпио 05", days:"daily"},
+      {t:"13:00", a:"13:15", name:"за Тетевен", op:"Алекса Транс", days:"mwf"},
+      {t:"13:00", a:"13:23", name:"за Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"13:00", a:"13:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+      {t:"14:00", a:"14:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"work_sat", price:"1,80 €"},
+      {t:"14:30", a:"14:56", name:"за Бъркач", op:"Дари Комерс", days:"work", price:"2,00 €"},
+      {t:"15:00", a:"15:23", name:"за Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"15:20", a:"15:32", name:"за Староселци", op:"Ауто клима транс", days:"daily"},
+      {t:"16:00", a:"16:14", name:"за Бяла Слатина", op:"Божи Дар Транс", days:"work"},
+      {t:"16:00", a:"16:24", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+      {t:"16:00", a:"16:26", name:"за Бъркач", op:"Дари Комерс", days:"work", price:"2,00 €"},
+      {t:"17:00", a:"17:23", name:"за Долни Дъбник", op:"Дари Комерс", days:"sat_sun_hol", price:"1,80 €"},
+      {t:"17:20", a:"17:46", name:"за Бъркач", op:"Дари Комерс", days:"daily", price:"2,00 €"},
+      {t:"17:30", a:"17:42", name:"за Долни Луковит", op:"Ауто клима транс", days:"work"},
+      {t:"18:00", a:"18:15", name:"за Тетевен", op:"Алекса Транс", days:"sun"},
+      {t:"18:00", a:"18:18", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+      {t:"19:00", a:"19:18", name:"за Долни Дъбник", op:"Дари Комерс", days:"sat_sun", price:"1,80 €"},
+      {t:"19:00", a:"19:23", name:"за Садовец", op:"Дари Комерс", days:"daily"},
+      {t:"19:15", a:"19:33", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+      {t:"19:30", a:"19:56", name:"за Бъркач", op:"Дари Комерс", days:"work", price:"2,00 €"},
+      {t:"20:30", a:"20:48", name:"за Долни Дъбник", op:"Дари Комерс", days:"work", price:"1,80 €"},
+    ]
+  }
+};
+
+// Официални празници в България — 2026 (вкл. компенсирани дни)
+const HOLIDAYS = new Set([
+  "2026-01-01","2026-03-03","2026-04-10","2026-04-11","2026-04-12","2026-04-13",
+  "2026-05-01","2026-05-06","2026-05-24","2026-05-25",
+  "2026-09-06","2026-09-07","2026-09-22",
+  "2026-12-24","2026-12-25","2026-12-26","2026-12-28"
+]);
+
+const DAY_SETS = {
+  daily:       ["work","sat","sun","hol"],
+  work:        ["work"],
+  work_sat:    ["work","sat"],
+  work_sun:    ["work","sun"],
+  sat:         ["sat"],
+  sun:         ["sun"],
+  sun_hol:     ["sun","hol"],
+  sat_sun:     ["sat","sun"],
+  sat_sun_hol: ["sat","sun","hol"],
+  no_sat:      ["work","sun","hol"],
+  no_sun:      ["work","sat","hol"],
+  mwf:         ["work"], // + проверка на ден от седмицата
+};
+
+const DAY_LABELS = {
+  daily:"всеки ден", work:"пон–пет (раб. дни)", work_sat:"пон–съб", work_sun:"раб. дни и неделя",
+  sat:"само събота", sun:"само неделя", sun_hol:"неделя и празници", sat_sun:"събота и неделя",
+  sat_sun_hol:"съб., нед. и празници", no_sat:"без събота", no_sun:"без неделя", mwf:"пон., ср., пет."
+};
+
+let dir = "yp", filter = "all";
+
+function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function dayType(d){
+  if (HOLIDAYS.has(iso(d))) return "hol";
+  const w = d.getDay();
+  return w === 6 ? "sat" : w === 0 ? "sun" : "work";
+}
+function runsOn(svc, dt, date){
+  if (!DAY_SETS[svc.days].includes(dt)) return false;
+  if (svc.days === "mwf" && date) return [1,3,5].includes(date.getDay());
+  return true;
+}
+function mins(t){ const [h,m] = t.split(":").map(Number); return h*60+m; }
+
+function allServices(d){
+  const trains = DATA[d].trains.map(s => ({...s, mode:"train"}));
+  const buses  = DATA[d].buses.map(s => ({...s, mode:"bus"}));
+  return trains.concat(buses).sort((a,b) => mins(a.t)-mins(b.t));
+}
+
+function fmtCountdown(m){
+  if (m < 1) return "тръгва сега!";
+  if (m < 60) return "след " + m + " мин";
+  const h = Math.floor(m/60), r = m%60;
+  return "след " + h + " ч " + (r ? r + " мин" : "");
+}
+
+const DT_NAMES = { work:"работен ден", sat:"събота", sun:"неделя", hol:"официален празник" };
+
+function render(){
+  const now = new Date();
+  const sel = document.getElementById("daysel").value;
+  const auto = sel === "auto";
+  const dtToday = auto ? dayType(now) : sel;
+  const nowM = mins(String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0"));
+
+  document.getElementById("clock").textContent =
+    now.toLocaleTimeString("bg-BG",{hour:"2-digit",minute:"2-digit"});
+  document.getElementById("daylabel").textContent =
+    now.toLocaleDateString("bg-BG",{weekday:"long", day:"numeric", month:"long"}) +
+    (dtToday === "hol" ? " (празник)" : "");
+
+  document.getElementById("dir-yp").classList.toggle("active", dir==="yp");
+  document.getElementById("dir-py").classList.toggle("active", dir==="py");
+  document.querySelectorAll(".filters button").forEach(b =>
+    b.classList.toggle("active", b.dataset.f === filter));
+
+  const list = allServices(dir).filter(s => filter==="all" || s.mode===filter);
+
+  // следващо тръгване (само в режим "днес")
+  const nextEl = document.getElementById("next");
+  let nextSvc = null, nextTomorrow = false;
+  if (auto) {
+    nextSvc = list.find(s => runsOn(s, dtToday, now) && mins(s.t) >= nowM);
+    if (!nextSvc) {
+      const tmr = new Date(now); tmr.setDate(tmr.getDate()+1);
+      const dtTmr = dayType(tmr);
+      nextSvc = list.find(s => runsOn(s, dtTmr, tmr));
+      nextTomorrow = true;
+    }
+  }
+  if (nextSvc) {
+    const diff = nextTomorrow
+      ? (24*60 - nowM) + mins(nextSvc.t)
+      : mins(nextSvc.t) - nowM;
+    nextEl.innerHTML = `
+      <div class="next-card">
+        <div class="label">⏱ Най-скорошно тръгване · ${DATA[dir].from} → ${DATA[dir].to}${nextTomorrow ? " · УТРЕ" : ""}</div>
+        <div class="main">
+          <span class="time">${nextSvc.t}</span>
+          <span class="countdown">${fmtCountdown(diff)}</span>
+          <span class="badge ${nextSvc.mode}">${nextSvc.mode==="train"?"Влак":"Автобус"}</span>
+        </div>
+        <div class="details">
+          <b>${nextSvc.name}</b>${nextSvc.via ? " · " + nextSvc.via : ""}${nextSvc.op ? " · " + nextSvc.op : ""}<br>
+          Пристига в ${DATA[dir].to}: <b>${nextSvc.a}</b> · Движи се: ${DAY_LABELS[nextSvc.days]}
+        </div>
+      </div>`;
+  } else {
+    nextEl.innerHTML = "";
+  }
+
+  document.getElementById("listtitle").textContent =
+    "Всички тръгвания " + DATA[dir].from + " → " + DATA[dir].to +
+    " (" + (auto ? "днес — " + DT_NAMES[dtToday] : DT_NAMES[dtToday]) + ")";
+
+  const dayList = list.filter(s => runsOn(s, dtToday, auto ? now : null));
+  const ul = document.getElementById("list");
+  if (!dayList.length) {
+    ul.innerHTML = '<li class="empty">Няма курсове за избрания ден.</li>';
+    return;
+  }
+  ul.innerHTML = dayList.map(s => {
+    const past = auto && mins(s.t) < nowM;
+    const isNext = nextSvc && !nextTomorrow && s === nextSvc;
+    return `
+      <li class="${past ? "past" : ""}${isNext ? " next-hl" : ""}">
+        <span class="t">${s.t}</span>
+        <span class="badge ${s.mode}">${s.mode==="train"?"Влак":"Бус"}</span>
+        <span class="info">
+          <span class="r1">${s.name}</span>
+          <span class="r2">${[s.via, s.op, DAY_LABELS[s.days], s.price].filter(Boolean).join(" · ")}</span>
+        </span>
+        <span class="arr">пристига<b>${s.a}</b></span>
+      </li>`;
+  }).join("");
+}
+
+document.getElementById("dir-yp").onclick = () => { dir = "yp"; render(); };
+document.getElementById("dir-py").onclick = () => { dir = "py"; render(); };
+document.querySelectorAll(".filters button").forEach(b =>
+  b.onclick = () => { filter = b.dataset.f; render(); });
+document.getElementById("daysel").onchange = render;
+
+render();
+setInterval(render, 30000);
+</script>
+</body>
+</html>
